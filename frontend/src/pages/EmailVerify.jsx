@@ -33,14 +33,15 @@ const EmailVerify = () => {
       }
     });
   };
-
+  const { userEmail } = useContext(AppContent); 
+  console.log(userEmail);
   const onSubmitHandler = async (e) => {
     try {
       e.preventDefault();
       const otpArray = inputRefs.current.map((e) => e.value);
       const otp = otpArray.join('');
 
-      const { data } = await axios.post(backendUrl + '/api/auth/verify-account', { otp });
+      const { data } = await axios.post(backendUrl + '/api/auth/verify-account', {  email: userEmail,otp });
       if (data.success) {
         toast.success(data.message);
         getUserData();

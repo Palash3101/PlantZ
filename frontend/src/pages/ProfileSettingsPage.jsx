@@ -570,7 +570,7 @@ const ProfileSettingsPage = () => {
                   <h3 className="font-medium mb-3 text-red-600">Danger Zone</h3>
                   <button className="flex items-center justify-between w-full p-4 border border-red-200 rounded-lg hover:bg-red-50 text-red-600">
                     <span>Delete Account</span>
-                    <span className="text-sm">This action is irreversible</span>
+                    <span className="text-sm">Delete Account is irreversible</span>
                   </button>
                 </div>
               </motion.div>

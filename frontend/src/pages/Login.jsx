@@ -9,13 +9,13 @@ import { FiEyeOff, FiEye } from "react-icons/fi";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { backendUrl, setIsLoggedIn, getUserData } = useContext(AppContent);
+  const { backendUrl, setIsLoggedIn, getUserData, setUserEmail } = useContext(AppContent);
   const [state, setState] = useState('Login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
+    
   const onSubmitHandler = async (e) => {
     e.preventDefault();
 
@@ -35,8 +35,8 @@ const Login = () => {
           });
 
           if (data.success) {
+            setUserEmail(email); 
             setIsLoggedIn(true);
-            getUserData();
             navigate('/email-verify');
             toast.success(data.message || 'Registration successful!');
           }

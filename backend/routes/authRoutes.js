@@ -22,7 +22,7 @@ authRouter.post('/reset-password', resetPassword);
 // Authenticated routes
 authRouter.post('/logout', userAuth, logout);
 authRouter.get('/send-verify-otp', userAuth, sendVerifyOtp);
-authRouter.post('/verify-account', userAuth, verifyEmail);
+authRouter.post('/verify-account', verifyEmail);
 authRouter.get('/is-auth', userAuth, isAuthenticated);
 
 export default authRouter;

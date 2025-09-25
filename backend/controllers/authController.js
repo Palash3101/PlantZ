@@ -13,6 +13,7 @@ import { setAuthCookie, clearAuthCookie } from '../helpers/cookieHelpers.js';
 import { registerValidation, loginValidation, validate } from '../middleware/validationMiddleware.js';
 import { protect } from '../middleware/authMiddleware.js'; // Import authMiddleware
 
+const pendingUsers = new Map();
 // Register
 export const register = [
     registerValidation,
@@ -34,28 +35,15 @@ export const register = [
 
         try {
             const hashedPassword = await bcrypt.hash(password, 10);
-            const user = new userModel({ name, email, password: hashedPassword });
-            await user.save();
-
-            const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-            setAuthCookie(res, token);
-
-            // Send Welcome Email
-            const welcomeMailOptions = {
-                from: process.env.SENDER_EMAIL,
-                to: email,
-                subject: 'Welcome to PlantZ',
-                text: `Welcome to PlantZ website. Your account has been created with email id: ${email}`,
-            };
-
-            await transporter.sendMail(welcomeMailOptions);
-
-            // Send OTP Email
             const { otp, hashedOtp } = await generateAndHashOTP();
 
-            user.verifyOtp = hashedOtp;
-            user.verifyOtpExpireAt = Date.now() + 24 * 60 * 60 * 1000;
-            await user.save();
+            pendingUsers.set(email, {
+                name,
+                email,
+                password: hashedPassword,
+                verifyOtp: hashedOtp,
+                verifyOtpExpireAt: Date.now() + 24 * 60 * 60 * 1000
+            });
 
             const otpMailOption = {
                 from: process.env.SENDER_EMAIL,
@@ -64,9 +52,12 @@ export const register = [
                 html: EMAIL_VERIFY_TEMPLATE.replace('{{otp}}', otp).replace('{{email}}', email),
             };
 
-            await transporter.sendMail(otpMailOption);
+            transporter.sendMail(otpMailOption)
+            .then(() => console.log('OTP email sent'))
+            .catch((err) => console.error('Error sending OTP email:', err));
 
-            sendSuccess(res, {}, 'User registered successfully and OTP sent to email', 201);
+            sendSuccess(res, {}, 'OTP sent to email. Please verify your account.', 201);
+            
         } catch (error) {
             console.error('Registration error:', error);
             if (error.code === 11000) {
@@ -89,7 +80,6 @@ export const login = [
           if (!user) {
               return sendError(res, 'Invalid email or password', 400);
           }
-
           const isMatch = await bcrypt.compare(password, user.password);
           if (!isMatch) {
               return sendError(res, 'Invalid email or password', 400);
@@ -98,7 +88,7 @@ export const login = [
           const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
           setAuthCookie(res, token);
 
-          // Include a message and user data in the response
+         
           sendSuccess(res, { 
               user: {
                   _id: user._id,
@@ -165,34 +155,57 @@ export const sendVerifyOtp = [
 ];
 
 // Verify Email using OTP
-export const verifyEmail = [
-    protect,
-    asyncHandler(async (req, res) => {
-        const { otp } = req.body;
-        const userId = req.user._id; // Get userId from req.user
-
-        if (!otp) {
-            return sendError(res, 'Missing OTP', 400);
+export const verifyEmail = [asyncHandler(async (req, res) => {
+    const { email, otp } = req.body;
+        const pendingUser = pendingUsers.get(email);
+        if (!pendingUser) {
+            return sendError(res, 'No pending registration found', 404);
         }
 
-        const user = await userModel.findById(userId);
-        if (!user) {
-            return sendError(res, 'User not found', 404);
+    // Verify OTP
+    const isOtpValid = await verifyOTP(otp, pendingUser.verifyOtp);
+    if (!isOtpValid) {
+        return sendError(res, 'Invalid OTP', 400);
+    }
+
+    // Check if OTP expired
+    const user = new userModel({
+            name: pendingUser.name,
+            email: pendingUser.email,
+            password: pendingUser.password,
+            isAccountVerified: true
+        });
+    await user.save();
+    pendingUsers.delete(email)
+   
+
+
+        const welcomeMailOptions = {
+            from: process.env.SENDER_EMAIL,
+            to: user.email,
+            subject: 'Welcome to PlantZ',
+            text: `Welcome to PlantZ website. Your account has been created with email id: ${user.email}`,
+        };
+
+        try {
+            await transporter.sendMail(welcomeMailOptions);
+        } catch (error) {
+            console.error('Error sending welcome email:', error);
         }
-
-        const isOtpValid = await verifyOTP(otp, user.verifyOtp);
-        if (!isOtpValid) {
-            return sendError(res, 'Invalid OTP', 400);
-        }
-
-        user.isAccountVerified = true;
-        user.verifyOtp = '';
-        user.verifyOtpExpireAt = 0;
-        await user.save();
-
-        sendSuccess(res, {}, 'Email verified successfully');
+         clearAuthCookie(res); 
+         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        setAuthCookie(res, token); 
+        sendSuccess(res, {
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                isAccountVerified: user.isAccountVerified
+            }
+        }, 'Email verified and account created successfully');
     }),
 ];
+
 
 // Check if user is authenticated
 export const isAuthenticated = [

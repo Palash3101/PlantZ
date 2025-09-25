@@ -18,6 +18,7 @@ export const AppContextProvider = (props) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userData, setUserData] = useState(false)
   const [plants, setPlants] = useState(null)
+  const [userEmail, setUserEmail] = useState(''); // State to hold user email
 
 const getAuthState = async () => {
     try {
@@ -71,7 +72,8 @@ useEffect(()=>{
       isLoggedIn, setIsLoggedIn,
       userData, setUserData,
       getUserData,
-      plants, setPlants
+      plants, setPlants,
+      userEmail, setUserEmail 
   }
    
 
